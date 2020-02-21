@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JIRA Sync helper</title>
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+      integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/gijgo/1.9.13/combined/css/gijgo.min.css"
+      integrity="sha256-bH0WSMuCFoG/dxeox/5aOWmaZl729yDg4ylckwSRTfU="
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.12/css/select2.min.css"
+      integrity="sha256-FdatTf20PQr/rWg+cAKfl6j4/IY3oohFAJ7gVC3M34E="
+      crossorigin="anonymous"
+    />
+    <style type="text/css">
+      body {
+        padding: 10px;
+      }
+      .card-body {
+        padding: 0.75rem;
+      }
+      p {
+        margin-bottom: 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row" id="login-container" style="display: none;">
+        <div class="col-md-4 mx-auto">
+          <form id="login-form" action="/login" method="POST">
+            <div class="card">
+              <div class="card-header">
+                JIRA Login
+              </div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label for="host-field" class="control-label">Host</label>
+                  <input
+                    class="form-control"
+                    name="host"
+                    id="host-field"
+                    type="text"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="username-field" class="control-label"
+                    >Username</label
+                  >
+                  <input
+                    class="form-control"
+                    name="username"
+                    id="username-field"
+                    type="text"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="password-field" class="control-label"
+                    >Password</label
+                  >
+                  <input
+                    class="form-control"
+                    name="password"
+                    id="password-field"
+                    type="password"
+                  />
+                </div>
+                <input
+                  class="btn btn-primary"
+                  role="button"
+                  type="submit"
+                  value="Login"
+                />
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="row loginRequired py-3">
+        <div id="request-container" class="col-md-4">
+          <form id="request-form" action="/delta" method="POST">
+            <div class="card">
+              <div class="card-header">
+                JIRA Sync Helper
+              </div>
+              <div class="card-body">
+                <div class="form-group input-group input-daterange">
+                  <label for="since-field" class="control-label"
+                    >Changes since</label
+                  >
+                  <input id="datepicker" name="since" />
+                </div>
+                <div class="form-group">
+                  <label for="boardId-field" class="control-label">Board</label>
+                  <select
+                    class="form-control"
+                    id="boardId-field"
+                    name="boardId"
+                  >
+                  </select>
+                </div>
+                <div class="form-group">
+                  <input
+                    class="btn btn-primary"
+                    role="button"
+                    type="submit"
+                    value="Get delta"
+                  />
+                  <button
+                    class="btn btn-danger"
+                    id="reset-button"
+                    type="button"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="col-md-8">
+          <div class="card">
+            <div class="card-header" id="result-header"></div>
+            <div class="card-body" id="result-body"></div>
+          </div>
+        </div>
+      </div>
+      <div class="row loginRequired">
+        <div class="col-md-12">
+          <form id="logout-form" action="/logout" method="POST">
+            <div class="card">
+              <div class="card-body">
+                <input
+                  class="btn btn-danger"
+                  role="button"
+                  type="submit"
+                  value="Logout"
+                />
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"
+      integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"
+      integrity="sha256-/ijcOLwFf26xEYAjW75FizKVo5tnTYiQddPZoLUHHZ8="
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.4.1/js/bootstrap.min.js"
+      integrity="sha256-WqU1JavFxSAMcLP2WIOI+GB2zWmShMI82mTpLDcqFUg="
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/gijgo/1.9.13/combined/js/gijgo.min.js"
+      integrity="sha256-YZhUu69bCn9uTqQyKwwQ3GyRypS7eaxp/wmVS282sDI="
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/jquery-loading-overlay/2.1.6/loadingoverlay.min.js"
+      integrity="sha256-CImtjQVvmu/mM9AW+6gYkksByF4RBCeRzXMDA9MuAso="
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.12/js/select2.min.js"
+      integrity="sha256-wfVTTtJ2oeqlexBsfa3MmUoB77wDNRPqT1Q1WA2MMn4="
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.8.20/dayjs.min.js"
+      integrity="sha256-ca0AUcGacUBWNoFjEyMEXFfWfdNHNiGC5uTEsMWj1oQ="
+      crossorigin="anonymous"
+    ></script>
+
+    <script src="jira.js"></script>
+  </body>
+</html>
