@@ -9,8 +9,6 @@ const bodyParser = require('body-parser')
 const cookieParser = require('cookie-parser')
 
 const app = express();
-
-const DEFAULT_PORT = process.env.PORT || 3003
 const COOKIE_NAME = "jiraCredentials"
 const CARD_FIELDS = "assignee,summary,updated,created,parent,status,issuetype"
 const JIRA_DATE_FORMAT = "YYYY-MM-DD"
@@ -29,29 +27,34 @@ const jiraConfig = {
     strictSSL: true
 }
 
+// Use environment for consistent deployment on heroku
+const DEFAULT_PORT = process.env.PORT || 3003
 let config = {
-    port: DEFAULT_PORT
+    port: DEFAULT_PORT,
+    key: process.env.COOKIE_KEY ? process.env.COOKIE_KEY.split(",").map(x => +x) : null
 };
 
 // Read config
 const CONFIG_PATH = ".jiraconfig"
-fs.readFile(CONFIG_PATH, "utf-8", async (err, data) => {
-    if (err) {
-        generateKey()
-    } else {
-        try {
-            config = JSON.parse(data);
-            if (config.key && config.key.length != 16) {
+if (!config.key) {
+    fs.readFile(CONFIG_PATH, "utf-8", async (err, data) => {
+        if (err) {
+            generateKey()
+        } else {
+            try {
+                config = JSON.parse(data);
+                if (config.key && config.key.length != 16) {
+                    generateKey()
+                }
+                if (!config.port) {
+                    config.port = DEFAULT_PORT;
+                }
+            } catch (error) {
                 generateKey()
             }
-            if (!config.port) {
-                config.port = DEFAULT_PORT;
-            }
-        } catch (error) {
-            generateKey()
         }
-    }
-})
+    })
+}
 
 app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: false }))
