@@ -8,62 +8,51 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const cookieParser = require('cookie-parser')
 
+// Create express server with cookie and body-parser
 const app = express();
-const COOKIE_NAME = "jiraCredentials"
-const CARD_FIELDS = "assignee,summary,updated,created,parent,status,issuetype"
-const JIRA_DATE_FORMAT = "YYYY-MM-DD"
+app.use(cookieParser());
+app.use(bodyParser.urlencoded({ extended: false }))
 
-// exclude specific changes
-const EXCLUDED_CHANGES = ["epic link", "description", "rank", "attachment", "resolution"]
+// Include static frontend
+app.use(express.static(__dirname + '/public'));
+
+// Constants
+const CONFIG_PATH = ".jiraconfig"
+const COOKIE_NAME = "jiraCredentials"
+const JIRA_DATE_FORMAT = "YYYY-MM-DD"
+const GUI_DATE_FORMAT = "DD.MM.YYYY"
 
 // Configure date format
 dayjs.locale('de')
 dayjs.extend(customParseFormat)
 
-// Default parameters for JIRA
-const jiraConfig = {
-    protocol: 'https',
-    apiVersion: '2',
-    strictSSL: true
-}
-
-// Use environment for consistent deployment on heroku
-const DEFAULT_PORT = process.env.PORT || 3003
+// Default config
 let config = {
-    port: DEFAULT_PORT,
-    key: process.env.COOKIE_KEY ? process.env.COOKIE_KEY.split(",").map(x => +x) : null
+    port: process.env.PORT || 3003,
+    key: process.env.COOKIE_KEY ? process.env.COOKIE_KEY.split(",").map(x => +x) : null,
+    estimationField: process.env.ESTIMATION_FIELD || "customfield_10002",
+    excludedChanges: process.env.EXCLUDED_CHANGES ? process.env.EXCLUDED_CHANGES.split(",").toLowerCase() : ["epic link", "rank", "attachment", "description", "remoteissuelink", "workflow", "comment", "labels", "link", "resolution"],
+    jira: {
+        protocol: 'https',
+        apiVersion: '2',
+        strictSSL: true
+    },
+    // the current version does not support kanban-type boards
+    excludedBoardTypes: process.env.EXCLUDED_BOARD_TYPES || ["kanban"]
 };
 
-// Read config
-const CONFIG_PATH = ".jiraconfig"
-if (!config.key) {
-    fs.readFile(CONFIG_PATH, "utf-8", async (err, data) => {
-        if (err) {
-            generateKey()
-        } else {
-            try {
-                config = JSON.parse(data);
-                if (config.key && config.key.length != 16) {
-                    generateKey()
-                }
-                if (!config.port) {
-                    config.port = DEFAULT_PORT;
-                }
-            } catch (error) {
-                generateKey()
-            }
-        }
-    })
-}
+// Read config from config file (and generate key if necessary)
+readConfig();
 
-app.use(cookieParser());
-app.use(bodyParser.urlencoded({ extended: false }))
+// Set this constant after reading the config
+const CARD_FIELDS = `assignee,summary,updated,created,parent,status,issuetype,${config.estimationField}`
 
-app.use(express.static(__dirname + '/public'));
+// Check JIRA credentials
 app.use(async (req, res, next) => {
     const cookie = req.cookies[COOKIE_NAME];
     let credentials;
     try {
+        // Sign in with credentials from cookie
         credentials = decryptCookie(cookie);
         req.jira = await getJiraConnection(credentials);
     } catch (error) {
@@ -76,7 +65,7 @@ app.use(async (req, res, next) => {
                     host: body.host
                 }
                 req.jira = await getJiraConnection(credentials);
-                res.cookie(COOKIE_NAME, encryptCookie(credentials), { maxAge: 1209600000, httpOnly: true })
+                res.cookie(COOKIE_NAME, encryptCookie(credentials), { maxAge: (14 * 24 * 60 * 60 * 1000), httpOnly: true })
             } catch (error1) {
                 return res.send(401)
             }
@@ -87,11 +76,11 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// Routes
+// Get delta since specified date for board
 app.post('/delta', async (req, res) => {
     const boardId = req.body.boardId + "";
     // todo improve date handling
-    const sinceDate = dayjs(req.body.since, "DD.MM.YYYY").add(8, 'hour');
+    const sinceDate = dayjs(req.body.since, GUI_DATE_FORMAT).add(8, 'hour');
     const jira = req.jira;
 
     // get current sprint
@@ -109,7 +98,7 @@ app.post('/delta', async (req, res) => {
 
     // remove all irrelevant entries (see)
     const changedAndNotNewWithHistoryFiltered = changedAndNotNewWithHistory.map(issue => {
-        issue.changelog = issue.changelog.histories.filter(change => (dayjs(change.created) > sinceDate) && !EXCLUDED_CHANGES.includes(change.items[0].field.toLowerCase()))
+        issue.changelog = issue.changelog.histories.filter(change => (dayjs(change.created) > sinceDate) && !config.excludedChanges.includes(change.items[0].field.toLowerCase()))
         return issue;
     }).filter(issue => issue.changelog.length > 0)
         .map(issueSummary)
@@ -130,6 +119,7 @@ app.post('/delta', async (req, res) => {
     }));
 })
 
+// Get sprint info
 app.post('/getInfo', async (req, res) => {
     const jira = req.jira;
     const boardId = req.body.boardId;
@@ -145,15 +135,18 @@ app.post('/getInfo', async (req, res) => {
     res.send(`Sprintziel: "${sprintGoal}" - Offen: ${openIssueEstimation} - Abgeschlossen: ${completedIssueEstimation ? completedIssueEstimation : 0}`)
 })
 
+// Get boards for selection
 app.get('/getBoards', async (req, res) => {
     const jira = req.jira;
     const boardTypes = []
-    const boards = (await jira.getAllBoards(null, 9999)).values.map(board => {
-        if (!boardTypes.includes(board.type)) {
-            boardTypes.push(board.type)
-        }
-        return { id: board.id, text: board.name, type: board.type }
-    });
+    const boards = (await jira.getAllBoards(null, 9999)).values
+        .filter(board => !config.excludedBoardTypes.includes(board.type.toLowerCase()))
+        .map(board => {
+            if (!boardTypes.includes(board.type)) {
+                boardTypes.push(board.type)
+            }
+            return { id: board.id, text: board.name, type: board.type }
+        });
 
     const results = []
 
@@ -167,14 +160,17 @@ app.get('/getBoards', async (req, res) => {
     res.send(results)
 })
 
+// Check login credentials
 app.post('/check', async (req, res) => {
     res.send({ loggedIn: true });
 })
 
+// Login route
 app.post('/login', async (req, res) => {
     res.redirect("/");
 })
 
+// Logout route
 app.post('/logout', async (req, res) => {
     res.cookie(COOKIE_NAME, "", { maxAge: 0 })
     res.redirect("/");
@@ -186,9 +182,30 @@ app.listen(config.port, () => {
 
 
 // helper
+//
+
+// Generate key for encrypted cookie
 function generateKey() {
     config.key = Array.from(new Uint8Array(require("crypto").randomBytes(16)));
-    writeConfig()
+}
+
+function readConfig() {
+    fs.readFile(CONFIG_PATH, "utf-8", async (err, data) => {
+        try {
+            if (!err) {
+                config = { ...config, ...JSON.parse(data) };
+                if (config.key && config.key.length != 16) {
+                    throw new Error("Invalid key length")
+                }
+            } else {
+                throw new Error("No config file")
+            }
+        } catch (e) {
+            console.log(e);
+            generateKey()
+            writeConfig()
+        }
+    })
 }
 
 function writeConfig() {
@@ -197,12 +214,14 @@ function writeConfig() {
     });
 }
 
+// Simplify values for frontend delivery
 function issueSummary(issue) {
     return {
         key: issue.key,
         summary: issue.fields.summary,
         updated: issue.fields.updated,
         status: issue.fields.status.name,
+        estimate: issue.fields[config.estimationField] ? issue.fields[config.estimationField] : null,
         parent: issue.fields.parent ? issue.fields.parent.key : null,
         assignee: issue.fields.assignee ? issue.fields.assignee.displayName : null,
         assigneePic: issue.fields.assignee ? issue.fields.assignee.avatarUrls["32x32"] : null,
@@ -210,7 +229,9 @@ function issueSummary(issue) {
     }
 }
 
+// Stringify credentials (with nonce), encrypt and return
 function encryptCookie(credentials) {
+    credentials.nonce = Array.from(new Uint8Array(require("crypto").randomBytes(16))).join("");
     const credentialString = JSON.stringify(credentials);
     const credentialStringBytes = aesjs.utils.utf8.toBytes(credentialString);
     const aesCtr = new aesjs.ModeOfOperation.ctr(config.key);
@@ -228,7 +249,7 @@ function decryptCookie(credentialCookie) {
 
 async function getJiraConnection(credentials) {
     const jira = new JiraApi({
-        ...jiraConfig,
+        ...config.jira,
         ...credentials
     })
     const user = await jira.getCurrentUser();

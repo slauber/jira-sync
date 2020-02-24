@@ -32,22 +32,25 @@ $datepicker.datepicker({
 function generateEntry(item) {
     return `<div class="card mb-1">
                 <div class="card-header">
-
                 <div class="row justify-content-between align-middle">
-                    <div class="col-8">
-                    <span class="font-weight-bold align-middle">${item.key} (${item.issuetype})</span><span class="align-middle">: ${item.status} ${item.parent ? "(" + item.parent + ")</span>" : ""}
+                    <div class="col-7">
+                    <span class="font-weight-bold align-middle">${item.key} (${item.issuetype})</span><span class="align-middle">: ${item.status} ${item.parent ? "(" + item.parent + ")" : ""}</span>
                     </div>
-                    <div class="col-4 text-right">
+                    <div class="col-5 text-right">
                         ${item.assignee ? '<span class="font-weight-bold align-middle">' + item.assignee + '&nbsp;</span>' + '<img src="' + item.assigneePic + '" class="rounded-lg align-middle" />' : "Unassigned"}
                     </div>
                 </div>
             </div>
             <div class="card-body" .mb-n2>
-                            <p class="font-weight-normal">${item.summary}</p>
-                            <p class="font-weight-normal">${dayjs(item.updated).format(
-            "DD.MM.YYYY"
-        )}</p>
-    </div>
+                <div class="row">
+                    <div class="col-9"><p class="font-weight-normal">${item.summary}</p></div>
+                    <div class="col-3 text-right">
+                        <p class="font-weight-light">
+                            ${dayjs(item.updated).format("DD.MM.YYYY")}
+                            ${item.estimate ? ('<br>Estimate:' + item.estimate) : ""}
+                        </p></div>
+                </div>
+            </div>
           </div>`;
 }
 
