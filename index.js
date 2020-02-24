@@ -205,6 +205,7 @@ function issueSummary(issue) {
         status: issue.fields.status.name,
         parent: issue.fields.parent ? issue.fields.parent.key : null,
         assignee: issue.fields.assignee ? issue.fields.assignee.displayName : null,
+        assigneePic: issue.fields.assignee ? issue.fields.assignee.avatarUrls["32x32"] : null,
         issuetype: issue.fields.issuetype.name
     }
 }

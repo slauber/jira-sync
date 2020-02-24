@@ -31,17 +31,23 @@ $datepicker.datepicker({
 // template for item entries
 function generateEntry(item) {
     return `<div class="card mb-1">
-            <div class="card-header">
-              <span class="font-weight-bold">${item.key} (${
-        item.issuetype
-        })</span>: ${item.status} ${item.parent ? "(" + item.parent + ")" : ""}
+                <div class="card-header">
+
+                <div class="row justify-content-between align-middle">
+                    <div class="col-8">
+                    <span class="font-weight-bold align-middle">${item.key} (${item.issuetype})</span><span class="align-middle">: ${item.status} ${item.parent ? "(" + item.parent + ")</span>" : ""}
+                    </div>
+                    <div class="col-4 text-right">
+                        ${item.assignee ? '<span class="font-weight-bold align-middle">' + item.assignee + '&nbsp;</span>' + '<img src="' + item.assigneePic + '" class="rounded-lg align-middle" />' : "Unassigned"}
+                    </div>
+                </div>
             </div>
             <div class="card-body" .mb-n2>
-              <p class="font-weight-normal">${item.summary}</p>
-              <p class="font-weight-normal">${dayjs(item.updated).format(
+                            <p class="font-weight-normal">${item.summary}</p>
+                            <p class="font-weight-normal">${dayjs(item.updated).format(
             "DD.MM.YYYY"
         )}</p>
-            </div>
+    </div>
           </div>`;
 }
 
@@ -108,11 +114,11 @@ $requestForm.submit(function (event) {
             for (item of response.changedAndNotNewWithHistoryFiltered) {
                 changedTickets.push(generateEntry(item));
             }
+
             $resultBody.html(
                 '<h6 class="card-subtitle text-muted">' + response.sprintName + ": " + response.sprintGoal + '</h6>' +
                 '<h6 class="card-subtitle text-muted mt-1">Total estimate: ' + response.estimateAll + ", Done: " + response.estimateDone + ", Open: " + response.estimateOpen + '</h6>' +
-                '<h5 class="card-title mt-2">New tickets</h5>' +
-                newTickets.join("\n") +
+                ((newTickets.length > 0) ? '<h5 class="card-title mt-2">New tickets</h5>' + newTickets.join("\n") + '<hr>' : "") +
                 '<h5 class="card-title mt-2">Changed tickets</h5>' +
                 changedTickets.join("\n")
             );
