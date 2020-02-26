@@ -29,7 +29,7 @@ dayjs.extend(customParseFormat)
 // Default config
 let config = {
     port: process.env.PORT || 3003,
-    key: process.env.COOKIE_KEY ? process.env.COOKIE_KEY.split(",").map(x => +x) : null,
+    key: null, // see generateKey() below
     estimationField: process.env.ESTIMATION_FIELD || "customfield_10002",
     excludedChanges: process.env.EXCLUDED_CHANGES ? process.env.EXCLUDED_CHANGES.split(",").toLowerCase() : ["epic link", "rank", "attachment", "description", "remoteissuelink", "workflow", "comment", "labels", "link", "resolution"],
     jira: {
@@ -186,7 +186,8 @@ app.listen(config.port, () => {
 
 // Generate key for encrypted cookie
 function generateKey() {
-    config.key = Array.from(new Uint8Array(require("crypto").randomBytes(16)));
+    // generates new key only if there is no external key enforced by the process environment
+    config.key = (process.env.COOKIE_KEY ? process.env.COOKIE_KEY.split(",").map(x => +x) : null) || Array.from(new Uint8Array(require("crypto").randomBytes(16)));
 }
 
 function readConfig() {
